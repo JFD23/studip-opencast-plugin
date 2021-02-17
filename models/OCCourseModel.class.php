@@ -91,11 +91,11 @@ class OCCourseModel
                 // add additional episode metadata from opencast
                 $ordered_episodes = $this->episodeComparison($stored_episodes, $series);
             }
-            
+
             if ($unset_live) {
                 $oc_events = ApiEventsClient::create($this->getCourseID());
                 $events = $oc_events->getEpisodes(OCSeminarSeries::getSeries($this->getCourseID()));
-                
+
                 foreach ($ordered_episodes as $episode) {
                     if ($events[$episode['id']]->publication_status[0] == 'engage-live')
                     {
@@ -104,10 +104,22 @@ class OCCourseModel
                 }
             }
 
+            // Get the Sort order title = TITLE, start = DATE_PUBLISHED, mkdata = DATE_CREATED (?)
+            if ($_SESSION['opencast']['sort_order']) {
+                $sort_str = $_SESSION['opencast']['sort_order'];
+            }
+            else if (CourseConfig::get($this->getCourseID())->COURSE_SORT_ORDER) {
+                $sort_str = CourseConfig::get($this->getCourseID())->COURSE_SORT_ORDER;
+            }
+            else {
+                $sort_str = 'mkdate1';
+            }
+            $sort = substr($sort_str, 0, -1);
+            $reversed = boolval(substr($sort_str, -1));
             return $this->order_episodes_by(
-                ['start', 'title'],
-                [SORT_NATURAL, SORT_NATURAL],
-                [true, false],
+                [$sort],
+                [SORT_NATURAL],
+                [$reversed],
                 $ordered_episodes
             );
         } else {
@@ -169,9 +181,11 @@ class OCCourseModel
     {
         $episodes    = [];
         $oc_episodes = $this->prepareEpisodes($remote_episodes);
-        $lastpos;
 
-        $vis = \Config::get()->OPENCAST_HIDE_EPISODES
+        $vis_conf = CourseConfig::get($this->course_id)->COURSE_HIDE_EPISODES
+            ? boolval(CourseConfig::get($this->course_id)->COURSE_HIDE_EPISODES)
+            : \Config::get()->OPENCAST_HIDE_EPISODES;
+        $vis = $vis_conf
             ? 'invisible'
             : 'visible';
 
@@ -200,6 +214,7 @@ class OCCourseModel
 
         //add new episodes
         if (!empty($oc_episodes)) {
+            $timestamp = time();
             foreach ($oc_episodes as $episode) {
                 $lastpos++;
                 $episode['visibility'] = $vis;
@@ -247,6 +262,7 @@ class OCCourseModel
         if (is_array($oc_episodes)) foreach ($oc_episodes as $episode) {
             if (is_object($episode->mediapackage)) {
                 $presentation_preview  = false;
+                $preview               = false;
                 $presenter_download    = [];
                 $presentation_download = [];
                 $audio_download        = [];

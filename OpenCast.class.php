@@ -229,7 +229,7 @@ class OpenCast extends StudipPlugin implements SystemPlugin, StandardPlugin
 
         if (!empty($studyGroupId)) {
             $studyGroup = new Navigation($this->_('Zur Studiengruppe'));
-            $studyGroup->setURL(PluginEngine::getURL($this, ['cid' => $studyGroupId], 'course/index'));
+            $studyGroup->setURL(PluginEngine::getURL($this, ['cid' => $$linkedCourseId], 'course/redirect_studygroup/' . $studyGroupId));
             $main->addSubNavigation('studygroup', $studyGroup);
         }
 
@@ -356,19 +356,19 @@ class OpenCast extends StudipPlugin implements SystemPlugin, StandardPlugin
     {
         $metadata = parent::getMetadata();
 
-        $metadata['pluginname'] = _("OpenCast");
-        $metadata['displayname'] = _("OpenCast");
+        $metadata['pluginname'] = $this->_("Opencast");
+        $metadata['displayname'] = $this->_("Opencast");
 
-        $metadata['descriptionlong'] = _("Mit diesem Tool können Videos aus dem Vorlesungsaufzeichnungssystem "
+        $metadata['description'] = $this->_("Mit diesem Tool können Videos aus dem Vorlesungsaufzeichnungssystem "
             . "(Opencast) mit einer Stud.IP-Veranstaltung verknüpft werden. Die Aufzeichnungen werden in "
             . "einem eingebetteten Player in Stud.IP zur Verfügung gestellt. Darüberhinaus ist es mit "
             . "dieser Integration möglich die komplette Aufzeichnungsplanung für eine Veranstaltung "
             . "abzubilden. Voraussetzung hierfür sind entsprechende Einträge im Ablaufplan und eine "
             . "gebuchte Ressource mit einem Opencast-Capture-Agent. Vorhandene Medien können bei "
-            . "Bedarf nachträglich über die Upload-Funktion zur verknüpften Serie hinzugefügt werden."
+            . "Bedarf nachträglich über die Hochladen-Funktion zur verknüpften Serie hinzugefügt werden."
         );
 
-        $metadata['summary'] = _("Vorlesungsaufzeichnung");
+        $metadata['summary'] = $this->_("Vorlesungsaufzeichnung");
 
         return $metadata;
     }

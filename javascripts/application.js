@@ -343,7 +343,7 @@ const OC = {
                 var dialog = options.dialog;
                 var throttledRender = _.throttle(renderProgress, 200);
                 $(dialog).on("dialogbeforeclose", function () {
-                    return force || confirm("Wollen Sie den Medien-Upload wirklich abbrechen?")
+                    return force || confirm("Wollen Sie das Hochladen der Medien wirklich abbrechen?")
                 });
                 throttledRender();
                 origin.on("upload-progress", throttledRender);
@@ -407,6 +407,16 @@ const OC = {
                     });
                     return false;
                 }
+               
+                var maxLength = 128;
+      
+                uploadMedia.forEach(function (item, index) {
+                    var extension = item.file.name.split('.').pop();
+
+                    if (item.file.name.length > 128) {
+                    	  item.file.name = item.file.name.substring(0, maxLength - extension.length - 1) + '.' + extension;
+                    }
+                });
 
                 if (this.dataset.isUploading && this.dataset.isUploading) {
                     return false;

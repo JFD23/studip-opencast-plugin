@@ -535,9 +535,9 @@ class CourseController extends OpencastController
         if ($this->isLive($episode_id)) {
             throw new AccessDeniedException();
         }
-        
+
         $check_perm_for = Config::get()->OPENCAST_TUTOR_EPISODE_PERM ? ['tutor', 'dozent'] : 'dozent';
-        
+
         if (!$GLOBALS['perm']->have_studip_perm('admin', $this->course_id) && !OCModel::checkPermForEpisode($episode_id, $this->user_id, $check_perm_for)) {
             throw new AccessDeniedException();
         }
@@ -563,7 +563,7 @@ class CourseController extends OpencastController
     public function upload_action()
     {
         if ($this->isStudyGroup() && !$this->isStudentUploadForStudyGroupActivated()) {
-            PageLayout::postError(_('Uploads durch Studierende sind momentan verboten.'));
+            PageLayout::postError(_('Das Hochladen durch Studierende ist momentan verboten.'));
             $this->redirect('course/index/false');
         }
 
@@ -571,7 +571,7 @@ class CourseController extends OpencastController
         if (!$this->connectedSeries) {
             throw new Exception('Es ist keine Serie mit dieser Veranstaltung verknüpft!');
         }
-        $this->set_title($this->_('Opencast Medienupload'));
+        $this->set_title($this->_('Opencast Medien hochladen'));
 
         $workflow_client = WorkflowClient::getInstance();
 
@@ -742,10 +742,11 @@ class CourseController extends OpencastController
             $occourse->toggleSeriesVisibility();
             $visibility = $occourse->getSeriesVisibility();
             $vis        = ['visible' => 'sichtbar', 'invisible' => 'ausgeblendet'];
-            PageLayout::postSuccess(sprintf(
-                $this->_("Der Reiter in der Kursnavigation ist jetzt für alle Kursteilnehmer %s."),
-                htmlReady($vis[$visibility])
-            ));
+            if ($vis[$visibility] == 'sichtbar') {
+                PageLayout::postSuccess($this->_("Der Reiter in der Kursnavigation ist jetzt für alle Kursteilnehmer sichtbar."));
+            } else {
+                PageLayout::postSuccess($this->_("Der Reiter in der Kursnavigation ist jetzt für alle Kursteilnehmer ausgeblendet."));
+            }
 
             StudipLog::log(
                 'OC_CHANGE_TAB_VISIBILITY',
@@ -834,6 +835,10 @@ class CourseController extends OpencastController
 
     public function isDownloadAllowed()
     {
+    	if (!$GLOBALS['perm']->have_studip_perm('autor', $this->course_id)) {
+    		return false;
+    	}
+
         $courseConfig = CourseConfig::get($this->course_id)->OPENCAST_ALLOW_MEDIADOWNLOAD_PER_COURSE;
         switch ($courseConfig) {
             case 'yes':
@@ -866,6 +871,22 @@ class CourseController extends OpencastController
         $this->redirect('course/index/false');
     }
 
+    public function redirect_studygroup_action($studyGroupId)
+    {
+        if ($this->isStudentUploadEnabled()) {
+            $this->addAllMembersToStudyGroup(
+                Course::find($this->course_id),
+                Course::find($studyGroupId)
+            );
+            $this->redirect(
+                PluginEngine::getURL($this->plugin, ['cid' => $studyGroupId], 'course/index')
+            );
+            return;
+        }
+
+        $this->redirect('course/index');
+    }
+
     public function isStudentUploadEnabled()
     {
         $studyGroupId = CourseConfig::get($this->course_id)->OPENCAST_MEDIAUPLOAD_STUDY_GROUP;
@@ -875,21 +896,17 @@ class CourseController extends OpencastController
     public function remove_episode_action($ticket, $episode_id)
     {
         if (check_ticket($ticket) && $GLOBALS['perm']->have_studip_perm('tutor', $this->course_id)) {
-            $episode = \Opencast\Models\OCSeminarEpisodes::findOneBySQL(
-                'seminar_id = ? AND episode_id = ?',
-                [$this->course_id, $episode_id]
-            );
-            if ($episode) {
-                // live streams cannot be removed
-                if ($this->isLive($episode_id)) {
-                    throw new AccessDeniedException();
-                }
+            // live streams cannot be removed
+            if ($this->isLive($episode_id)) {
+                throw new AccessDeniedException();
+            }
 
-                if ($this->retractEpisode($episode)) {
-                    PageLayout::postSuccess($this->_('Die Episode wurde zum Entfernen markiert.'));
-                } else {
-                    PageLayout::postError($this->_('Die Episode konnte nicht zum Entfernen markiert werden.'));
-                }
+            $adminng_client = AdminNgEventClient::getInstance();
+
+            if ($adminng_client->deleteEpisode($episode_id)) {
+                PageLayout::postSuccess($this->_('Die Episode wurde zum Entfernen markiert.'));
+            } else {
+                PageLayout::postError($this->_('Die Episode konnte nicht zum Entfernen markiert werden.'));
             }
         }
 
@@ -945,7 +962,7 @@ class CourseController extends OpencastController
         $oc_events = ApiEventsClient::create($this->course_id);
         $events = $oc_events->getEpisodes(OCSeminarSeries::getSeries($this->course_id));
 
-        foreach ($event as $events) {
+        foreach ($events as $event) {
             if ($event['id'] === $episode_id) {
                 return $event->publication_status[0] == 'engage-live';
             }
@@ -972,15 +989,16 @@ class CourseController extends OpencastController
 
     private function createStudyGroupObject($course)
     {
+        $studygroup_sem_types = studygroup_sem_types();
         $studyGroup_name = $this->_("Studiengruppe:") . " " . $course['name'];
         $current_studyGroup = Course::findOneBySQL('name = :name AND status IN (:studygroup_mode)', [
             ':name'    => $studyGroup_name,
-            ':studygroup_mode' => \studygroup_sem_types(),
+            ':studygroup_mode' => $studygroup_sem_types,
         ]);
         if (!$current_studyGroup) {
             $studyGroup = new Course();
             $studyGroup['name'] = $studyGroup_name;
-            $studyGroup['status'] = array_shift(studygroup_sem_types());
+            $studyGroup['status'] = array_shift($studygroup_sem_types);
             $studyGroup['start_time'] = $course['start_time'];
             $studyGroup->store();
         } else {
@@ -1054,7 +1072,7 @@ class CourseController extends OpencastController
                 }
             )->pluck('user_id');
             foreach ($studyGroup->members as $member) {
-                if ( !in_array($member->user_id, array_values($course_dozenten)) ) {
+                if (!in_array($member->user_id, array_values($course_dozenten)) ) {
                     $studyGroupMember = CourseMember::find([$studyGroupId, $member->user_id]);
                     $studyGroupMember['status'] = 'tutor';
                     $studyGroupMember->store();
@@ -1073,5 +1091,25 @@ class CourseController extends OpencastController
     {
         $linkedCourseId = CourseConfig::get($this->course_id)->OPENCAST_MEDIAUPLOAD_LINKED_COURSE;
         return !empty($linkedCourseId);
+    }
+
+    public function sort_order_action()
+    {
+        if ($new_order = Request::get('order')) {
+            if ($GLOBALS['perm']->have_studip_perm('dozent', $this->course_id)) {
+                CourseConfig::get($this->course_id)->store('COURSE_SORT_ORDER', $new_order);
+            }
+            else {
+                $_SESSION['opencast']['sort_order'] = $new_order;
+            }
+        }
+        $this->redirect('course/index/false');
+    }
+
+    public function course_visibility_action($ticket, $visibility) {
+        if (check_ticket($ticket) && $GLOBALS['perm']->have_studip_perm('tutor', $this->course_id)) {
+            CourseConfig::get($this->course_id)->store('COURSE_HIDE_EPISODES', $visibility);
+        }
+        $this->redirect('course/index/false');
     }
 }

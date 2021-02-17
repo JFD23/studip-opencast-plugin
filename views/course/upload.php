@@ -4,6 +4,13 @@ use Studip\Button;
 use Studip\LinkButton;
 
 ?>
+
+<?
+$vis = CourseConfig::get($this->course_id)->COURSE_HIDE_EPISODES
+    ? boolval(CourseConfig::get($this->course_id)->COURSE_HIDE_EPISODES)
+    : \Config::get()->OPENCAST_HIDE_EPISODES;
+?>
+
 <form id="upload_form" action="#" enctype="multipart/form-data" method="post" class="default">
 
     <input type="hidden" name="series_id" value="<?= $series_id ?>">
@@ -37,8 +44,7 @@ use Studip\LinkButton;
     </Condition>
   </Rule>';
 
-if(\Config::get()->OPENCAST_HIDE_EPISODES == false){
-
+if($vis == false){
   $oc_acl.='<Rule RuleId="user_read_Permit" Effect="Permit">
     <Target>
       <Actions>
@@ -122,7 +128,7 @@ if(\Config::get()->OPENCAST_HIDE_EPISODES == false){
         $instructor_role = $this->course_id . '_Instructor';
         $learner_role = $this->course_id . '_Learner';
         $oc_acl          = str_replace('ROLE_USER_LTI_Instructor', $instructor_role, $oc_acl);
-	if(\Config::get()->OPENCAST_HIDE_EPISODES == false){
+	if($vis == false){
           $oc_acl          = str_replace('ROLE_USER_LTI_Learner', $learner_role, $oc_acl);
         }
         $oc_acl          = str_replace(["\r", "\n"], '', $oc_acl);
@@ -194,7 +200,7 @@ if(\Config::get()->OPENCAST_HIDE_EPISODES == false){
             <? if (!$workflow) : ?>
                 <p style="color:red; max-width: 48em;">
                     <?= $_(
-                        'Es wurde noch kein Standardworkflow eingestellt. Der Upload ist erst möglich nach Einstellung eines Standard- oder eines Kursspezifischen Workflows!'
+                        'Es wurde noch kein Standardworkflow eingestellt. Das Hochladen ist erst möglich nach Einstellung eines Standard- oder eines Kursspezifischen Workflows!'
                     ) ?>
                 </p>
             <? else : ?>
@@ -203,7 +209,7 @@ if(\Config::get()->OPENCAST_HIDE_EPISODES == false){
         </label>
 
         <label>
-            <?= $_('Chunk-Größe für Uploads') ?>
+            <?= $_('Chunk-Größe für hochgeladene Medien') ?>
             <p><?= round((float)$config['upload_chunk_size'] / 1024 / 1024, 2) ?> MB</p>
         </label>
     </section>
@@ -273,7 +279,7 @@ if(\Config::get()->OPENCAST_HIDE_EPISODES == false){
 
 <div id="oc-media-upload-dialog" style="display: none;">
     <div class="oc-media-upload-dialog-content">
-        <h1 class="hide-in-dialog"><?= $_("Medien-Upload") ?></h1>
+        <h1 class="hide-in-dialog"><?= $_("Medien hochladen") ?></h1>
         <p><?= $_("Ihre Medien werden gerade hochgeladen.") ?></p>
         <div>
             <ul class="files">
